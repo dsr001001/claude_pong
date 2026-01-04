@@ -194,6 +194,37 @@
             ctx.shadowBlur = 0;
         }
 
+        // Draw Mickey Mouse icon next to paddle
+        function drawMickeyIcon() {
+            const headX = 8;
+            const headY = player.y + player.height / 2;
+            const headRadius = 8;
+            const earRadius = 5;
+
+            // Draw ears (behind head)
+            ctx.fillStyle = '#1a1a1a';
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 1;
+
+            // Left ear
+            ctx.beginPath();
+            ctx.arc(headX - 6, headY - 7, earRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Right ear
+            ctx.beginPath();
+            ctx.arc(headX + 6, headY - 7, earRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw head
+            ctx.beginPath();
+            ctx.arc(headX, headY, headRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+
         // Draw ball with glow
         function drawBall() {
             const color = getBallColor();
@@ -384,6 +415,7 @@
             drawCenterLine();
             drawParticles();
             drawWall();
+            drawMickeyIcon();
             drawPaddle();
             drawBall();
         }
