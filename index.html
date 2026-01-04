@@ -52,6 +52,17 @@
             font-size: 14px;
             margin-top: 10px;
         }
+        #canvas-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        #mickey {
+            position: absolute;
+            left: -50px;
+            width: 45px;
+            height: auto;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -59,7 +70,10 @@
         <div id="bonus"></div>
         <div id="score">Score: 0</div>
         <div id="stats">Speed: 1.0x | Rally: 0</div>
-        <canvas id="pong" width="600" height="400"></canvas>
+        <div id="canvas-wrapper">
+            <img id="mickey" src="image/OIP.webp" alt="Mickey">
+            <canvas id="pong" width="600" height="400"></canvas>
+        </div>
         <div id="instructions">Use mouse or arrow keys to move the paddle</div>
     </div>
 
@@ -69,6 +83,7 @@
         const scoreDisplay = document.getElementById('score');
         const statsDisplay = document.getElementById('stats');
         const bonusDisplay = document.getElementById('bonus');
+        const mickeyImg = document.getElementById('mickey');
 
         // Game constants
         const paddleWidth = 12;
@@ -194,35 +209,10 @@
             ctx.shadowBlur = 0;
         }
 
-        // Draw Mickey Mouse icon next to paddle
-        function drawMickeyIcon() {
-            const headX = 8;
-            const headY = player.y + player.height / 2;
-            const headRadius = 8;
-            const earRadius = 5;
-
-            // Draw ears (behind head)
-            ctx.fillStyle = '#1a1a1a';
-            ctx.strokeStyle = '#444';
-            ctx.lineWidth = 1;
-
-            // Left ear
-            ctx.beginPath();
-            ctx.arc(headX - 6, headY - 7, earRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-
-            // Right ear
-            ctx.beginPath();
-            ctx.arc(headX + 6, headY - 7, earRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-
-            // Draw head
-            ctx.beginPath();
-            ctx.arc(headX, headY, headRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
+        // Update Mickey image position
+        function updateMickeyPosition() {
+            const mickeyHeight = mickeyImg.offsetHeight || 60;
+            mickeyImg.style.top = (player.y + player.height / 2 - mickeyHeight / 2) + 'px';
         }
 
         // Draw ball with glow
@@ -415,9 +405,9 @@
             drawCenterLine();
             drawParticles();
             drawWall();
-            drawMickeyIcon();
             drawPaddle();
             drawBall();
+            updateMickeyPosition();
         }
 
         // Game loop
