@@ -56,12 +56,15 @@
             position: relative;
             display: inline-block;
         }
-        #mickey {
+        #mickey-canvas {
             position: absolute;
-            left: -50px;
-            width: 45px;
-            height: auto;
+            left: -55px;
+            width: 50px;
+            height: 60px;
             pointer-events: none;
+            background: transparent;
+            border: none;
+            box-shadow: none;
         }
         .overlay {
             position: absolute;
@@ -149,7 +152,7 @@
         <div id="score">Score: 0</div>
         <div id="stats">Speed: 1.0x | Rally: 0</div>
         <div id="canvas-wrapper">
-            <img id="mickey" src="image/OIP.webp" alt="Mickey">
+            <canvas id="mickey-canvas" width="50" height="60"></canvas>
             <canvas id="pong" width="600" height="400"></canvas>
 
             <!-- Start Screen Overlay -->
@@ -186,7 +189,8 @@
         const scoreDisplay = document.getElementById('score');
         const statsDisplay = document.getElementById('stats');
         const bonusDisplay = document.getElementById('bonus');
-        const mickeyImg = document.getElementById('mickey');
+        const mickeyCanvas = document.getElementById('mickey-canvas');
+        const mickeyCtx = mickeyCanvas.getContext('2d');
         const highScoreDisplay = document.getElementById('high-score-display');
         const startOverlay = document.getElementById('start-overlay');
         const pauseOverlay = document.getElementById('pause-overlay');
@@ -565,9 +569,80 @@
             }
         }
 
-        function updateMickeyPosition() {
-            const mickeyHeight = mickeyImg.offsetHeight || 60;
-            mickeyImg.style.top = (player.y + player.height / 2 - mickeyHeight / 2) + 'px';
+        function drawMickey() {
+            // Position canvas
+            mickeyCanvas.style.top = (player.y + player.height / 2 - 30) + 'px';
+
+            // Clear canvas
+            mickeyCtx.clearRect(0, 0, 50, 60);
+
+            // Calculate smile level based on score (0 to 1)
+            const smileLevel = Math.min(score / 100, 1);
+
+            const centerX = 25;
+            const centerY = 35;
+
+            // Draw ears (black circles)
+            mickeyCtx.fillStyle = '#1a1a1a';
+            // Left ear
+            mickeyCtx.beginPath();
+            mickeyCtx.arc(centerX - 12, centerY - 18, 10, 0, Math.PI * 2);
+            mickeyCtx.fill();
+            // Right ear
+            mickeyCtx.beginPath();
+            mickeyCtx.arc(centerX + 12, centerY - 18, 10, 0, Math.PI * 2);
+            mickeyCtx.fill();
+
+            // Draw head (black circle)
+            mickeyCtx.beginPath();
+            mickeyCtx.arc(centerX, centerY, 18, 0, Math.PI * 2);
+            mickeyCtx.fill();
+
+            // Draw face (skin color oval)
+            mickeyCtx.fillStyle = '#fdd9b5';
+            mickeyCtx.beginPath();
+            mickeyCtx.ellipse(centerX, centerY + 4, 12, 10, 0, 0, Math.PI * 2);
+            mickeyCtx.fill();
+
+            // Draw eyes (black ovals)
+            mickeyCtx.fillStyle = '#1a1a1a';
+            // Left eye
+            mickeyCtx.beginPath();
+            mickeyCtx.ellipse(centerX - 5, centerY, 2.5, 4, 0, 0, Math.PI * 2);
+            mickeyCtx.fill();
+            // Right eye
+            mickeyCtx.beginPath();
+            mickeyCtx.ellipse(centerX + 5, centerY, 2.5, 4, 0, 0, Math.PI * 2);
+            mickeyCtx.fill();
+
+            // Draw nose (black oval)
+            mickeyCtx.beginPath();
+            mickeyCtx.ellipse(centerX, centerY + 6, 3, 2, 0, 0, Math.PI * 2);
+            mickeyCtx.fill();
+
+            // Draw mouth (bezier curve - smile changes with score)
+            mickeyCtx.strokeStyle = '#1a1a1a';
+            mickeyCtx.lineWidth = 1.5;
+            mickeyCtx.beginPath();
+
+            // Smile curve: control point Y goes down as smileLevel increases
+            const smileWidth = 6 + smileLevel * 2;
+            const smileCurve = 2 + smileLevel * 6; // 2 = neutral, 8 = big smile
+
+            mickeyCtx.moveTo(centerX - smileWidth, centerY + 10);
+            mickeyCtx.quadraticCurveTo(centerX, centerY + 10 + smileCurve, centerX + smileWidth, centerY + 10);
+            mickeyCtx.stroke();
+
+            // Add rosy cheeks when smiling a lot
+            if (smileLevel > 0.5) {
+                mickeyCtx.fillStyle = `rgba(255, 150, 150, ${(smileLevel - 0.5) * 0.6})`;
+                mickeyCtx.beginPath();
+                mickeyCtx.arc(centerX - 9, centerY + 5, 3, 0, Math.PI * 2);
+                mickeyCtx.fill();
+                mickeyCtx.beginPath();
+                mickeyCtx.arc(centerX + 9, centerY + 5, 3, 0, Math.PI * 2);
+                mickeyCtx.fill();
+            }
         }
 
         function drawBall() {
@@ -771,7 +846,7 @@
             drawPowerUps();
             drawPaddle();
             drawBall();
-            updateMickeyPosition();
+            drawMickey();
         }
 
         function gameLoop() {
