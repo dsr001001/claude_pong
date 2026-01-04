@@ -11,24 +11,44 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background: #222;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             font-family: Arial, sans-serif;
         }
         #game-container {
             text-align: center;
         }
         canvas {
-            background: #000;
+            background: linear-gradient(180deg, #0a0a15 0%, #1a1a30 100%);
             display: block;
             margin: 0 auto;
+            border: 2px solid #333;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
         }
         #score {
-            color: #fff;
-            font-size: 24px;
+            color: #0ff;
+            font-size: 28px;
             margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        #stats {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        #bonus {
+            color: #ff0;
+            font-size: 18px;
+            height: 24px;
+            margin-bottom: 5px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #bonus.show {
+            opacity: 1;
         }
         #instructions {
-            color: #888;
+            color: #666;
             font-size: 14px;
             margin-top: 10px;
         }
@@ -36,7 +56,9 @@
 </head>
 <body>
     <div id="game-container">
+        <div id="bonus"></div>
         <div id="score">Score: 0</div>
+        <div id="stats">Speed: 1.0x | Rally: 0</div>
         <canvas id="pong" width="600" height="400"></canvas>
         <div id="instructions">Use mouse or arrow keys to move the paddle</div>
     </div>
@@ -45,21 +67,31 @@
         const canvas = document.getElementById('pong');
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('score');
+        const statsDisplay = document.getElementById('stats');
+        const bonusDisplay = document.getElementById('bonus');
 
-        // Game objects
-        const paddleWidth = 10;
+        // Game constants
+        const paddleWidth = 12;
         const paddleHeight = 80;
         const ballSize = 10;
+        const baseSpeed = 4;
+        const speedMultiplierIncrease = 1.05;
+        const maxSpeedMultiplier = 2.5;
 
+        // Game state
         let score = 0;
+        let rallyCount = 0;
+        let speedMultiplier = 1.0;
 
-        // Player paddle (left side)
+        // Player paddle
         const player = {
             x: 20,
             y: canvas.height / 2 - paddleHeight / 2,
             width: paddleWidth,
             height: paddleHeight,
-            dy: 0
+            dy: 0,
+            prevY: canvas.height / 2 - paddleHeight / 2,
+            velocity: 0
         };
 
         // Ball
@@ -67,11 +99,16 @@
             x: canvas.width / 2,
             y: canvas.height / 2,
             size: ballSize,
-            dx: 4,
-            dy: 3
+            dx: baseSpeed,
+            dy: 3,
+            spin: 0
         };
 
-        // Wall (right side - acts as auto-return)
+        // Particle trail
+        const particles = [];
+        const maxParticles = 20;
+
+        // Wall (right side)
         const wall = {
             x: canvas.width - 20,
             y: 0,
@@ -79,23 +116,112 @@
             height: canvas.height
         };
 
-        // Draw rectangle
-        function drawRect(x, y, w, h, color) {
-            ctx.fillStyle = color;
-            ctx.fillRect(x, y, w, h);
+        // Get ball color based on speed
+        function getBallColor() {
+            const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+            const normalizedSpeed = Math.min((speedMultiplier - 1) / (maxSpeedMultiplier - 1), 1);
+
+            if (normalizedSpeed < 0.33) {
+                // White to Yellow
+                const t = normalizedSpeed / 0.33;
+                return `rgb(255, 255, ${Math.round(255 - t * 255)})`;
+            } else if (normalizedSpeed < 0.66) {
+                // Yellow to Orange
+                const t = (normalizedSpeed - 0.33) / 0.33;
+                return `rgb(255, ${Math.round(255 - t * 100)}, 0)`;
+            } else {
+                // Orange to Red
+                const t = (normalizedSpeed - 0.66) / 0.34;
+                return `rgb(255, ${Math.round(155 - t * 155)}, 0)`;
+            }
         }
 
-        // Draw ball
+        // Get spin trail color
+        function getSpinColor() {
+            if (Math.abs(ball.spin) < 0.1) return getBallColor();
+            return ball.spin > 0 ? '#ff6b6b' : '#6bcfff';
+        }
+
+        // Add particle
+        function addParticle() {
+            if (particles.length >= maxParticles) {
+                particles.shift();
+            }
+            particles.push({
+                x: ball.x,
+                y: ball.y,
+                size: ball.size * 0.8,
+                alpha: 0.6,
+                color: getSpinColor()
+            });
+        }
+
+        // Update particles
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].alpha -= 0.04;
+                particles[i].size *= 0.95;
+                if (particles[i].alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // Draw particles
+        function drawParticles() {
+            particles.forEach(p => {
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        // Draw paddle with gradient
+        function drawPaddle() {
+            const gradient = ctx.createLinearGradient(player.x, player.y, player.x + player.width, player.y);
+            gradient.addColorStop(0, '#00ffff');
+            gradient.addColorStop(1, '#0066ff');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Glow effect
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 15;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            ctx.shadowBlur = 0;
+        }
+
+        // Draw ball with glow
         function drawBall() {
-            ctx.fillStyle = '#fff';
+            const color = getBallColor();
+
+            // Glow
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 20;
+
+            ctx.fillStyle = color;
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, ball.size, 0, Math.PI * 2);
             ctx.fill();
+
+            ctx.shadowBlur = 0;
         }
 
-        // Draw dashed center line
+        // Draw wall with glow
+        function drawWall() {
+            const gradient = ctx.createLinearGradient(wall.x, 0, wall.x + wall.width, 0);
+            gradient.addColorStop(0, '#444');
+            gradient.addColorStop(1, '#666');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+        }
+
+        // Draw center line
         function drawCenterLine() {
-            ctx.strokeStyle = '#444';
+            ctx.strokeStyle = '#333';
             ctx.setLineDash([10, 10]);
             ctx.beginPath();
             ctx.moveTo(canvas.width / 2, 0);
@@ -104,16 +230,72 @@
             ctx.setLineDash([]);
         }
 
+        // Calculate score for a hit
+        function calculateHitScore() {
+            let points = 1; // Base point
+            let bonuses = [];
+
+            // Speed bonus (1-3 points based on multiplier)
+            if (speedMultiplier >= 1.5) {
+                const speedBonus = Math.min(Math.floor((speedMultiplier - 1) * 3), 3);
+                points += speedBonus;
+                bonuses.push(`Speed +${speedBonus}`);
+            }
+
+            // Edge hit bonus
+            const hitPos = (ball.y - player.y) / player.height;
+            if (hitPos < 0.2 || hitPos > 0.8) {
+                points += 2;
+                bonuses.push('Edge +2');
+            }
+
+            // Spin return bonus
+            if (Math.abs(ball.spin) > 0.3) {
+                points += 2;
+                bonuses.push('Spin +2');
+            }
+
+            // Rally bonus (every 5 hits)
+            if (rallyCount > 0 && rallyCount % 5 === 0) {
+                points += 1;
+                bonuses.push('Rally +1');
+            }
+
+            // Show bonus notification
+            if (bonuses.length > 0) {
+                showBonus(bonuses.join(' | '));
+            }
+
+            return points;
+        }
+
+        // Show bonus notification
+        function showBonus(text) {
+            bonusDisplay.textContent = text;
+            bonusDisplay.classList.add('show');
+            setTimeout(() => {
+                bonusDisplay.classList.remove('show');
+            }, 1000);
+        }
+
         // Reset ball to center
         function resetBall() {
             ball.x = canvas.width / 2;
             ball.y = canvas.height / 2;
-            ball.dx = 4;
+            ball.dx = baseSpeed;
             ball.dy = 3 * (Math.random() > 0.5 ? 1 : -1);
+            ball.spin = 0;
+            speedMultiplier = 1.0;
+            rallyCount = 0;
+            particles.length = 0;
         }
 
         // Update game state
         function update() {
+            // Calculate paddle velocity
+            player.velocity = player.y - player.prevY;
+            player.prevY = player.y;
+
             // Move player paddle with keyboard
             player.y += player.dy;
 
@@ -123,56 +305,86 @@
                 player.y = canvas.height - player.height;
             }
 
+            // Apply spin to ball trajectory
+            ball.dy += ball.spin * 0.1;
+            ball.spin *= 0.98; // Decay spin over time
+
             // Move ball
-            ball.x += ball.dx;
+            ball.x += ball.dx * speedMultiplier;
             ball.y += ball.dy;
 
+            // Add particle trail
+            addParticle();
+            updateParticles();
+
             // Ball collision with top/bottom walls
-            if (ball.y - ball.size < 0 || ball.y + ball.size > canvas.height) {
-                ball.dy *= -1;
+            if (ball.y - ball.size < 0) {
+                ball.y = ball.size;
+                ball.dy = Math.abs(ball.dy);
+            }
+            if (ball.y + ball.size > canvas.height) {
+                ball.y = canvas.height - ball.size;
+                ball.dy = -Math.abs(ball.dy);
             }
 
-            // Ball collision with right wall (bounces back)
+            // Ball collision with right wall
             if (ball.x + ball.size > wall.x) {
-                ball.dx *= -1;
-                score++;
-                scoreDisplay.textContent = 'Score: ' + score;
+                ball.x = wall.x - ball.size;
+                ball.dx = -Math.abs(ball.dx);
             }
 
             // Ball collision with player paddle
             if (ball.x - ball.size < player.x + player.width &&
+                ball.x + ball.size > player.x &&
                 ball.y > player.y &&
-                ball.y < player.y + player.height) {
+                ball.y < player.y + player.height &&
+                ball.dx < 0) {
+
+                // Bounce
                 ball.dx = Math.abs(ball.dx);
-                // Add some angle based on where ball hits paddle
+                ball.x = player.x + player.width + ball.size;
+
+                // Apply spin based on paddle velocity
+                ball.spin = player.velocity * 0.15;
+
+                // Angle based on hit position
                 let hitPos = (ball.y - player.y) / player.height;
                 ball.dy = (hitPos - 0.5) * 8;
+
+                // Increase rally and speed
+                rallyCount++;
+                if (speedMultiplier < maxSpeedMultiplier) {
+                    speedMultiplier *= speedMultiplierIncrease;
+                    speedMultiplier = Math.min(speedMultiplier, maxSpeedMultiplier);
+                }
+
+                // Calculate and add score
+                const points = calculateHitScore();
+                score += points;
+
+                // Update displays
+                scoreDisplay.textContent = 'Score: ' + score;
+                statsDisplay.textContent = `Speed: ${speedMultiplier.toFixed(2)}x | Rally: ${rallyCount}`;
             }
 
-            // Ball goes past player (game over condition)
-            if (ball.x < 0) {
+            // Ball goes past player (game over)
+            if (ball.x < -ball.size) {
                 alert('Game Over! Final Score: ' + score);
                 score = 0;
                 scoreDisplay.textContent = 'Score: ' + score;
+                statsDisplay.textContent = 'Speed: 1.0x | Rally: 0';
                 resetBall();
             }
         }
 
         // Render game
         function render() {
-            // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw center line
             drawCenterLine();
-
-            // Draw wall
-            drawRect(wall.x, wall.y, wall.width, wall.height, '#555');
-
-            // Draw player paddle
-            drawRect(player.x, player.y, player.width, player.height, '#fff');
-
-            // Draw ball
+            drawParticles();
+            drawWall();
+            drawPaddle();
             drawBall();
         }
 
@@ -185,8 +397,8 @@
 
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowUp') player.dy = -6;
-            if (e.key === 'ArrowDown') player.dy = 6;
+            if (e.key === 'ArrowUp') player.dy = -8;
+            if (e.key === 'ArrowDown') player.dy = 8;
         });
 
         document.addEventListener('keyup', (e) => {
